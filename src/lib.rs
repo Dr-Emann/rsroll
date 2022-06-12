@@ -66,7 +66,7 @@ pub trait Engine {
 
 #[inline]
 fn roll_windowed<E: Engine>(engine: &mut E, window_size: usize, data: &[u8]) {
-    let last_window = data.windows(window_size).next_back().unwrap_or(data);
+    let last_window = data.windows(window_size).last().unwrap_or(data);
     for &b in last_window {
         engine.roll_byte(b);
     }
@@ -114,17 +114,34 @@ mod tests {
 
                     let data = rand_data(512 * 1024);
                     let mut remaining = &data[..];
-                    while let Some((i, digest)) =
-                        engine1.find_chunk_edge_cond(remaining, |e| e.digest() & 0x0F == 0x0F)
-                    {
+                    let f = |engine: &$engine| -> bool { engine.digest() & 0x0F == 0x0F };
+                    while let Some((i, digest)) = engine1.find_chunk_edge_cond(remaining, f) {
+                        assert_ne!(i, 0);
                         let mut engine2 = <$engine>::default();
-                        engine2.roll(&remaining[..i]);
+                        // find_chunk doesn't check the state before adding any values
+                        for j in 0..i {
+                            engine2.roll_byte(remaining[j]);
+                            // Only expect true from f on the last value
+                            assert_eq!(f(&engine2), j == i - 1);
+                        }
                         assert_eq!(engine2.digest(), digest);
 
                         remaining = &remaining[i..];
                         engine2.reset();
                         assert_eq!(engine2.digest(), engine1.digest());
                     }
+                    // No edges found in the remaining data, let's check
+                    let mut engine2 = <$engine>::default();
+                    for &b in remaining {
+                        engine2.roll_byte(b);
+                        assert!(!f(&engine2));
+                    }
+                    assert_eq!(engine2.digest(), engine1.digest());
+
+                    // Ensure the window is still intact
+                    engine1.roll_byte(0x1);
+                    engine2.roll_byte(0x1);
+                    assert_eq!(engine2.digest(), engine1.digest());
                 }
             }
         };

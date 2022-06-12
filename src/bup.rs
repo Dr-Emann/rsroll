@@ -64,6 +64,40 @@ impl Engine for Bup {
         ((self.s1 as Digest) << 16) | ((self.s2 as Digest) & 0xffff)
     }
 
+    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<(usize, Self::Digest)>
+    where
+        F: FnMut(&Self) -> bool,
+    {
+        let first_window = buf.windows(WINDOW_SIZE).next().unwrap_or(buf);
+        for (i, &byte) in first_window.iter().enumerate() {
+            self.roll_byte(byte);
+            if cond(self) {
+                let digest = self.digest();
+                self.reset();
+                return Some((i + 1, digest));
+            }
+        }
+
+        if buf.len() > WINDOW_SIZE {
+            // WINDOW_SIZE + 1, because we need the old byte to shift out
+            for (i, window) in buf.windows(WINDOW_SIZE + 1).enumerate() {
+                let (&drop, window) = window.split_first().unwrap();
+                self.add(drop, *window.last().unwrap());
+                if cond(self) {
+                    let digest = self.digest();
+                    self.reset();
+                    return Some((i + WINDOW_SIZE + 1, digest));
+                }
+            }
+            // No chunk edge found, need to copy back into the window
+            self.wofs = 0;
+            // Safe to unwrap because we know the buf is longer than WINDOW_SIZE
+            let last_window = buf.windows(WINDOW_SIZE).last().unwrap();
+            self.window.copy_from_slice(last_window);
+        }
+        None
+    }
+
     #[inline]
     fn reset(&mut self) {
         *self = Bup {
