@@ -79,6 +79,7 @@ impl Engine for Bup {
         }
 
         if buf.len() > WINDOW_SIZE {
+            let mut last_window = buf;
             // WINDOW_SIZE + 1, because we need the old byte to shift out
             for (i, window) in buf.windows(WINDOW_SIZE + 1).enumerate() {
                 let (&drop, window) = window.split_first().unwrap();
@@ -88,11 +89,10 @@ impl Engine for Bup {
                     self.reset();
                     return Some((i + WINDOW_SIZE + 1, digest));
                 }
+                last_window = window;
             }
             // No chunk edge found, need to copy back into the window
             self.wofs = 0;
-            // Safe to unwrap because we know the buf is longer than WINDOW_SIZE
-            let last_window = buf.windows(WINDOW_SIZE).last().unwrap();
             self.window.copy_from_slice(last_window);
         }
         None
