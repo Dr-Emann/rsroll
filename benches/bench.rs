@@ -13,9 +13,9 @@ fn bench_roll_byte(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(SIZE as u64));
 
     macro_rules! bench_engine {
-        ($name:ident) => {{
+        ($name:ty) => {{
             group.bench_function(concat!(stringify!($name), "/byte_by_byte"), |b| {
-                let mut engine = rollsum::$name::new();
+                let mut engine = <$name>::new();
                 b.iter(|| {
                     for _ in 0..SIZE {
                         engine.roll_byte(black_box(0));
@@ -24,30 +24,40 @@ fn bench_roll_byte(c: &mut Criterion) {
             });
 
             group.bench_function(concat!(stringify!($name), "/all"), |b| {
-                let mut engine = rollsum::$name::new();
+                let mut engine = <$name>::new();
                 b.iter(|| {
                     engine.roll(black_box(&data));
                     black_box(engine.digest());
                 });
             });
 
+        }};
+    }
+
+    macro_rules! bench_chunker {
+        ($name:ident, $build:expr) => {
             group.bench_function(concat!(stringify!($name), "/split"), |b| {
                 use rollsum::Chunker;
-                let engine = rollsum::$name::new();
-                let mut chunker = rollsum::RollingHashChunker::with_mask(engine, (1 << 15) - 1);
+                let mut chunker = $build;
                 b.iter(|| {
                     chunker.for_each_chunk_end(&data, |chunk| {
                         black_box(chunk.len());
                     });
                 });
             });
-        }};
+        };
     }
 
     #[cfg(feature = "gear")]
-    bench_engine!(Gear);
+    bench_engine!(rollsum::Gear);
     #[cfg(feature = "bup")]
-    bench_engine!(Bup);
+    bench_engine!(rollsum::Bup);
+
+    #[cfg(feature = "gear")]
+    bench_chunker!(Gear, rollsum::RollingHashChunker::<rollsum::Gear>::with_mask(rollsum::Gear::new(), (1 << 15) - 1));
+    #[cfg(feature = "bup")]
+    bench_chunker!(Bup, rollsum::RollingHashChunker::<rollsum::Bup>::with_mask(rollsum::Bup::new(), (1 << 15) - 1));
+    bench_chunker!(FastCDC, rollsum::FastCDC::new());
 }
 
 criterion_group!(benches, bench_roll_byte);

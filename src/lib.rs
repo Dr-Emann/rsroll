@@ -89,6 +89,7 @@ pub trait Chunker {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RollingHashChunker<RH: RollingHash> {
     rh: RH,
     mask: RH::Digest,
