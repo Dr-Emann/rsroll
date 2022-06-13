@@ -1,42 +1,33 @@
-use super::Engine;
+use super::RollingHash;
 use std::default::Default;
 use std::mem;
-use std::num::Wrapping;
 
 pub type Digest = u64;
-
-/// Default chunk size used by `gear`
-pub const CHUNK_SIZE: u32 = 1 << CHUNK_BITS;
-
-/// Default chunk size used by `gear` (log2)
-pub const CHUNK_BITS: u32 = 13;
 
 /// The effective window size used by `gear`
 pub const WINDOW_SIZE: usize = mem::size_of::<Digest>() * 8;
 
 pub struct Gear {
-    digest: Wrapping<Digest>,
-    chunk_bits: u32,
+    digest: Digest,
 }
 
 impl Default for Gear {
     fn default() -> Self {
-        Gear {
-            digest: Wrapping(0),
-            chunk_bits: CHUNK_BITS,
+        Self {
+            digest: 0,
         }
     }
 }
 
 include!("_gear_rand.rs");
 
-impl Engine for Gear {
+impl RollingHash for Gear {
     type Digest = Digest;
 
     #[inline(always)]
     fn roll_byte(&mut self, b: u8) {
         self.digest <<= 1;
-        self.digest += Wrapping(G[b as usize]);
+        self.digest = self.digest.wrapping_add(G[b as usize]);
     }
 
     fn roll(&mut self, buf: &[u8]) {
@@ -45,43 +36,19 @@ impl Engine for Gear {
 
     #[inline(always)]
     fn digest(&self) -> Digest {
-        self.digest.0
+        self.digest
     }
 
     #[inline]
     fn reset(&mut self) {
-        *self = Gear {
-            chunk_bits: self.chunk_bits,
-            ..Default::default()
-        }
+        self.digest = 0;
     }
 }
 
 impl Gear {
-    /// Create new Gear engine with default chunking settings
+    /// Create new Gear engine
     pub fn new() -> Self {
         Default::default()
-    }
-
-    /// Create new Gear engine with custom chunking settings
-    ///
-    /// `chunk_bits` is number of bits that need to match in
-    /// the edge condition. `CHUNK_BITS` constant is the default.
-    pub fn new_with_chunk_bits(chunk_bits: u32) -> Self {
-        assert!(chunk_bits < 32);
-        Gear {
-            chunk_bits,
-            ..Default::default()
-        }
-    }
-
-    /// Find chunk edge using Gear defaults.
-    ///
-    /// See `Engine::find_chunk_edge_cond`.
-    pub fn find_chunk_edge(&mut self, buf: &[u8]) -> Option<(usize, Digest)> {
-        const DIGEST_SIZE: usize = mem::size_of::<Digest>();
-        let shift = DIGEST_SIZE as u32 - self.chunk_bits;
-        self.find_chunk_edge_cond(buf, |e: &Gear| (e.digest() >> shift) == 0)
     }
 }
 

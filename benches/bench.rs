@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use nanorand::Rng;
-use rollsum::Engine;
+use rollsum::RollingHash;
 
 fn bench_roll_byte(c: &mut Criterion) {
     const SIZE: usize = 128 * 1024;
