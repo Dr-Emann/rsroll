@@ -31,6 +31,7 @@ fn bench_roll_byte(c: &mut Criterion) {
                 });
             });
 
+            /*
             group.bench_function(concat!(stringify!($name), "/split"), |b| {
                 let mut engine = rollsum::$name::new();
                 b.iter(|| {
@@ -41,6 +42,7 @@ fn bench_roll_byte(c: &mut Criterion) {
                     }
                 });
             });
+             */
         }};
     }
 
