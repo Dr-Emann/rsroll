@@ -31,18 +31,17 @@ fn bench_roll_byte(c: &mut Criterion) {
                 });
             });
 
-            /*
             group.bench_function(concat!(stringify!($name), "/split"), |b| {
                 let mut engine = rollsum::$name::new();
                 b.iter(|| {
                     let mut remaining = black_box(&data[..]);
-                    while let Some((new_i, digest)) = engine.find_chunk_edge(remaining) {
-                        black_box((new_i, digest));
+                    while let Some(new_i) = engine.find_chunk_edge_cond(remaining, |e| e.digest() & ((1 << 15) - 1) == 0) {
+                        black_box(new_i);
                         remaining = &remaining[new_i..];
+                        engine.reset();
                     }
                 });
             });
-             */
         }};
     }
 
