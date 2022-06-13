@@ -16,6 +16,9 @@ pub mod gear;
 #[cfg(feature = "gear")]
 pub use crate::gear::Gear;
 
+pub mod fastcdc;
+pub use fastcdc::FastCDC;
+
 /// Rolling sum engine trait
 pub trait RollingHash {
     type Digest;
@@ -97,6 +100,22 @@ where
 {
     pub fn with_mask(rh: RH, mask: RH::Digest) -> Self {
         Self { rh, mask }
+    }
+
+    pub fn hasher(&self) -> &RH {
+        &self.rh
+    }
+
+    pub fn hasher_mut(&mut self) -> &mut RH {
+        &mut self.rh
+    }
+
+    pub fn into_hasher(self) -> RH {
+        self.rh
+    }
+
+    pub fn set_mask(&mut self, mask: RH::Digest) {
+        self.mask = mask;
     }
 }
 
