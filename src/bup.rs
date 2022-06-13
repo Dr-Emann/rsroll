@@ -3,8 +3,8 @@ use std::default::Default;
 
 pub type Digest = u32;
 
-const WINDOW_BITS: usize = 6;
-const WINDOW_SIZE: usize = 1 << WINDOW_BITS;
+const DEFAULT_WINDOW_BITS: usize = 6;
+const DEFAULT_WINDOW_SIZE: usize = 1 << DEFAULT_WINDOW_BITS;
 
 const CHAR_OFFSET: usize = 31;
 
@@ -14,14 +14,14 @@ const CHAR_OFFSET: usize = 31;
 /// https://github.com/bup/bup/blob/706e8d273/lib/bup/bupsplit.c
 /// https://github.com/bup/bup/blob/706e8d273/lib/bup/bupsplit.h
 /// (a bit like https://godoc.org/camlistore.org/pkg/rollsum)
-pub struct Bup {
+pub struct Bup<const WINDOW_SIZE: usize = DEFAULT_WINDOW_SIZE> {
     s1: usize,
     s2: usize,
     window: [u8; WINDOW_SIZE],
     wofs: usize,
 }
 
-impl Default for Bup {
+impl<const WINDOW_SIZE: usize> Default for Bup<WINDOW_SIZE> {
     fn default() -> Self {
         Bup {
             s1: WINDOW_SIZE * CHAR_OFFSET,
@@ -32,7 +32,7 @@ impl Default for Bup {
     }
 }
 
-impl RollingHash for Bup {
+impl<const WINDOW_SIZE: usize> RollingHash for Bup<WINDOW_SIZE> {
     type Digest = Digest;
 
     #[inline(always)]
@@ -92,16 +92,18 @@ impl RollingHash for Bup {
 
     #[inline]
     fn reset(&mut self) {
-        *self = Bup::new();
+        *self = Bup::default();
     }
 }
 
-impl Bup {
+impl Bup<DEFAULT_WINDOW_SIZE> {
     /// Create new Bup engine with default chunking settings
     pub fn new() -> Self {
         Default::default()
     }
+}
 
+impl<const WINDOW_SIZE: usize> Bup<WINDOW_SIZE> {
     #[inline(always)]
     fn add(&mut self, drop: u8, add: u8) {
         self.s1 += add as usize;
@@ -138,9 +140,6 @@ mod tests {
 
     #[test]
     fn bup_selftest() {
-        use super::Bup;
-        const WINDOW_SIZE: usize = 1 << 6;
-
         const SELFTEST_SIZE: usize = 100000;
         let mut buf = [0u8; SELFTEST_SIZE];
 
@@ -157,11 +156,11 @@ mod tests {
         let sum1b: u32 = sum(&buf[1..]);
 
         let sum2a: u32 =
-            sum(&buf[SELFTEST_SIZE - WINDOW_SIZE * 5 / 2..SELFTEST_SIZE - WINDOW_SIZE]);
-        let sum2b: u32 = sum(&buf[0..SELFTEST_SIZE - WINDOW_SIZE]);
+            sum(&buf[SELFTEST_SIZE - DEFAULT_WINDOW_SIZE * 5 / 2..SELFTEST_SIZE - DEFAULT_WINDOW_SIZE]);
+        let sum2b: u32 = sum(&buf[0..SELFTEST_SIZE - DEFAULT_WINDOW_SIZE]);
 
-        let sum3a: u32 = sum(&buf[0..WINDOW_SIZE + 4]);
-        let sum3b: u32 = sum(&buf[3..WINDOW_SIZE + 4]);
+        let sum3a: u32 = sum(&buf[0..DEFAULT_WINDOW_SIZE + 4]);
+        let sum3b: u32 = sum(&buf[3..DEFAULT_WINDOW_SIZE + 4]);
 
         assert_eq!(sum1a, sum1b);
         assert_eq!(sum2a, sum2b);
