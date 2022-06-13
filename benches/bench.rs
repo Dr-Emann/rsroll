@@ -32,14 +32,13 @@ fn bench_roll_byte(c: &mut Criterion) {
             });
 
             group.bench_function(concat!(stringify!($name), "/split"), |b| {
-                let mut engine = rollsum::$name::new();
+                use rollsum::Chunker;
+                let engine = rollsum::$name::new();
+                let mut chunker = rollsum::RollingHashChunker::with_mask(engine, (1 << 15) - 1);
                 b.iter(|| {
-                    let mut remaining = black_box(&data[..]);
-                    while let Some(new_i) = engine.find_chunk_edge_cond(remaining, |e| e.digest() & ((1 << 15) - 1) == 0) {
-                        black_box(new_i);
-                        remaining = &remaining[new_i..];
-                        engine.reset();
-                    }
+                    chunker.for_each_chunk_end(&data, |chunk| {
+                        black_box(chunk.len());
+                    });
                 });
             });
         }};

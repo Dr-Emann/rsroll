@@ -7,6 +7,7 @@ extern crate test;
 /// `bup` - https://github.com/bup/bup/
 #[cfg(feature = "bup")]
 pub mod bup;
+
 #[cfg(feature = "bup")]
 pub use crate::bup::Bup;
 
@@ -59,6 +60,61 @@ pub trait RollingHash {
             }
         }
         None
+    }
+}
+
+pub trait Chunker {
+    /// Find the next split position
+    ///
+    /// When the end of a chunk is found, the state of the chunker is reset.
+    ///
+    /// Returns:
+    /// * None - no chunk split was found, all of `buf` belongs to the current chunk
+    /// * Some - prefix length of `buf` that belongs to the current chunk.
+    ///          data after the returned length have not been processed yet.
+    fn chunk_end(&mut self, buf: &[u8]) -> Option<usize>;
+
+    fn for_each_chunk_end<'a, F>(&mut self, mut buf: &'a [u8], mut f: F)
+    where
+        F: FnMut(&'a [u8]),
+    {
+        while let Some(chunk_end) = self.chunk_end(buf) {
+            let (chunk, rest) = buf.split_at(chunk_end);
+            f(chunk);
+            buf = rest;
+        }
+    }
+}
+
+pub struct RollingHashChunker<RH: RollingHash> {
+    rh: RH,
+    mask: RH::Digest,
+}
+
+impl<RH> RollingHashChunker<RH>
+where
+    RH: RollingHash,
+{
+    pub fn with_mask(rh: RH, mask: RH::Digest) -> Self {
+        Self { rh, mask }
+    }
+}
+
+impl<RH> Chunker for RollingHashChunker<RH>
+where
+    RH: RollingHash,
+    RH::Digest: Copy,
+    RH::Digest: Default,
+    RH::Digest: std::ops::BitAnd<Output = RH::Digest>,
+    RH::Digest: std::cmp::PartialEq,
+{
+    fn chunk_end(&mut self, buf: &[u8]) -> Option<usize> {
+        let mask = self.mask;
+        let res = self.rh.find_chunk_edge_cond(buf, |rh| rh.digest() & mask == RH::Digest::default());
+        if res.is_some() {
+            self.rh.reset();
+        }
+        res
     }
 }
 
