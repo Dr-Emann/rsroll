@@ -36,7 +36,6 @@ pub struct FastCDC {
     gear: Gear,
     mask_short: u64,
     mask_long: u64,
-    ignore_size: u64,
     min_size: u64,
     avg_size: u64,
     max_size: u64,
@@ -66,11 +65,9 @@ impl FastCDC {
     pub fn new_with_chunk_bits(chunk_bits: u32) -> Self {
         let (mask_short, mask_long) = get_masks(1 << chunk_bits, 2, 0);
         const SPREAD_BITS: u32 = 3;
-        const WINDOW_SIZE: usize = 64;
 
         let min_size = (1 << (chunk_bits - SPREAD_BITS + 1)) as u64;
 
-        let ignore_size = min_size - WINDOW_SIZE as u64;
         let avg_size = (1 << chunk_bits) as u64;
         let max_size = (1 << (chunk_bits + SPREAD_BITS)) as u64;
 
@@ -79,7 +76,6 @@ impl FastCDC {
             gear: Gear::new(),
             mask_short,
             mask_long,
-            ignore_size,
             min_size,
             avg_size,
             max_size,
@@ -95,16 +91,6 @@ impl Chunker for FastCDC {
         let mask_long = self.mask_long;
 
         debug_assert!(self.current_chunk_size < self.max_size);
-
-        // ignore bytes that are not going to influence the digest
-        if self.current_chunk_size < self.ignore_size {
-            let skip_bytes = cmp::min(
-                self.ignore_size - self.current_chunk_size,
-                left.len() as u64,
-            );
-            self.current_chunk_size += skip_bytes;
-            left = &left[skip_bytes as usize..];
-        }
 
         // ignore edges in bytes that are smaller than min_size
         if self.current_chunk_size < self.min_size {
