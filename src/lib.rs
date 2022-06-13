@@ -47,7 +47,7 @@ pub trait RollingHash {
     /// * Some - offset of the first unconsumed byte of `buf` and the digest of
     ///   the whole chunk. `offset` == buf.len() if the chunk ended right after
     ///   the whole `buf`.
-    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<(usize, Self::Digest)>
+    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<usize>
     where
         F: FnMut(&Self) -> bool,
     {
@@ -55,9 +55,7 @@ pub trait RollingHash {
             self.roll_byte(b);
 
             if cond(self) {
-                let digest = self.digest();
-                self.reset();
-                return Some((i + 1, digest));
+                return Some(i + 1);
             }
         }
         None
@@ -115,7 +113,9 @@ mod tests {
                     let data = rand_data(512 * 1024);
                     let mut remaining = &data[..];
                     let f = |engine: &$engine| -> bool { engine.digest() & 0x0F == 0x0F };
-                    while let Some((i, digest)) = engine1.find_chunk_edge_cond(remaining, f) {
+                    while let Some(i) = engine1.find_chunk_edge_cond(remaining, f) {
+                        let digest = engine1.digest();
+                        engine1.reset();
                         assert_ne!(i, 0);
                         let mut engine2 = <$engine>::default();
                         // find_chunk doesn't check the state before adding any values

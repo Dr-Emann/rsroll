@@ -60,7 +60,7 @@ impl<const WINDOW_SIZE: usize> RollingHash for Bup<WINDOW_SIZE> {
         ((self.s1 as Digest) << 16) | ((self.s2 as Digest) & 0xffff)
     }
 
-    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<(usize, Self::Digest)>
+    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<usize>
     where
         F: FnMut(&Self) -> bool,
     {
@@ -68,9 +68,7 @@ impl<const WINDOW_SIZE: usize> RollingHash for Bup<WINDOW_SIZE> {
         for (i, &byte) in first_window.iter().enumerate() {
             self.roll_byte(byte);
             if cond(self) {
-                let digest = self.digest();
-                self.reset();
-                return Some((i + 1, digest));
+                return Some(i + 1);
             }
         }
 
@@ -81,9 +79,9 @@ impl<const WINDOW_SIZE: usize> RollingHash for Bup<WINDOW_SIZE> {
                 let (&drop, window) = window.split_first().unwrap();
                 self.add(drop, *window.last().unwrap());
                 if cond(self) {
-                    let digest = self.digest();
-                    self.reset();
-                    return Some((i + WINDOW_SIZE + 1, digest));
+                    self.wofs = 0;
+                    self.window.copy_from_slice(window);
+                    return Some(i + WINDOW_SIZE + 1);
                 }
                 last_window = window;
             }
