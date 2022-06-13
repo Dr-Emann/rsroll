@@ -23,6 +23,7 @@ pub struct Bup<const WINDOW_SIZE: usize = DEFAULT_WINDOW_SIZE> {
 
 impl<const WINDOW_SIZE: usize> Default for Bup<WINDOW_SIZE> {
     fn default() -> Self {
+        assert_ne!(WINDOW_SIZE, 0);
         Bup {
             s1: WINDOW_SIZE * CHAR_OFFSET,
             s2: WINDOW_SIZE * (WINDOW_SIZE - 1) * CHAR_OFFSET,
@@ -41,6 +42,9 @@ impl<const WINDOW_SIZE: usize> RollingHash for Bup<WINDOW_SIZE> {
         // we're in strict control of `wofs`, it is justified
         // to skip bound checking to increase the performance
         // https://github.com/rust-lang/rfcs/issues/811
+
+        // SAFETY: `wofs` is always in the range [0, WINDOW_SIZE)
+        //         and WINDOW_SIZE is always > 0
         let prevch = unsafe { *self.window.get_unchecked(self.wofs) };
         self.add(prevch, newch);
         unsafe { *self.window.get_unchecked_mut(self.wofs) = newch };
