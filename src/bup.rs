@@ -97,9 +97,9 @@ impl Engine for Bup {
         }
     }
 
-    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], cond: F) -> Option<(usize, Self::Digest)>
+    fn find_chunk_edge_cond<F>(&mut self, buf: &[u8], mut cond: F) -> Option<(usize, Self::Digest)>
     where
-        F: Fn(&Self) -> bool,
+        F: FnMut(&Self) -> bool,
     {
         let mut incoming_bytes = buf.iter().copied().enumerate();
         let outgoing_slices = &[&self.window[self.wofs..], &self.window[..self.wofs], buf];
